@@ -22,7 +22,7 @@ const client = new YomitanClient();
 // Create MCP Server
 const server = new McpServer({
   name: "yomitan-mcp",
-  version: "1.1.0"
+  version: "1.2.0"
 });
 
 // --- Response Optimization Utilities ---
@@ -89,17 +89,36 @@ function optimizeTokenizeResponse(data) {
   }));
 }
 
-// Known Anki field markers for auto-discovery probing
+// Known Anki field markers for auto-discovery probing (exhaustive list from Yomitan source)
 const KNOWN_MARKERS = [
-  "expression", "reading", "glossary", "sentence", "tags",
-  "furigana-plain", "furigana-html",
-  "pitch-accent-graphs", "pitch-accent-positions",
-  "audio", "screenshot", "document-title",
-  "clipboard-text", "clipboard-image",
-  "cloze-prefix", "cloze-body", "cloze-suffix",
-  "dictionary", "frequencies", "popup-selection-text",
-  "sentence-furigana",
+  // Core fields
+  "expression", "reading", "glossary", "sentence", "tags", "url",
+  // Furigana variants
+  "furigana", "furigana-plain", "sentence-furigana", "sentence-furigana-plain",
+  // Glossary variants
+  "glossary-brief", "glossary-first", "glossary-first-brief",
+  "glossary-first-no-dictionary", "glossary-no-dictionary",
+  "glossary-plain", "glossary-plain-no-dictionary",
+  // Pitch accent
+  "pitch-accents", "pitch-accent-categories", "pitch-accent-graphs",
+  "pitch-accent-graphs-jj", "pitch-accent-positions",
+  // Frequency
+  "frequencies", "frequency-average-occurrence", "frequency-average-rank",
+  "frequency-harmonic-occurrence", "frequency-harmonic-rank",
+  // Grammar & linguistics
+  "conjugation", "part-of-speech", "phonetic-transcriptions",
+  // Media & context
+  "audio", "screenshot", "document-title", "search-query",
+  "clipboard-text", "clipboard-image", "popup-selection-text",
+  // Cloze deletion
+  "cloze-prefix", "cloze-body", "cloze-body-kana", "cloze-suffix",
+  // Dictionary metadata
+  "dictionary", "dictionary-alias",
 ];
+// NOTE: Dynamic markers (user-specific, depend on installed dictionaries/frequency sources):
+//   - "single-glossary-{dictionary name}" e.g. "single-glossary-広辞苑-第七版"
+//   - "single-frequency-number-{source}" e.g. "single-frequency-number-jpdb"
+// These are discovered automatically by anki_discover via brute-force probing.
 
 // Helper for error handling
 const handleApiError = (error, action) => {
@@ -236,21 +255,49 @@ server.tool(
   "anki_discover",
   `Auto-detect which Anki field markers are valid in the user's Yomitan configuration.
 Call this tool BEFORE using 'anki_fields' to discover which markers the user has configured.
-This probes each known marker against Yomitan's ankiFields API with a test word and reports which ones succeed.`,
+This probes all known static markers AND dynamically discovers user-specific markers like 'single-glossary-{dict name}' and 'single-frequency-number-{source}'.`,
   {},
   async () => {
     log("info", "Executing anki_discover");
     const testWord = "食べる";
     const valid = [];
     const invalid = [];
-    const errors = [];
 
-    for (const marker of KNOWN_MARKERS) {
+    // Step 1: Discover dynamic markers from a lookup response (dictionary names + frequency sources)
+    const dynamicMarkers = [];
+    try {
+      const lookupResponse = await client.findTerms(testWord);
+      const entries = lookupResponse?.dictionaryEntries ?? lookupResponse ?? [];
+      const dictNames = new Set();
+      const freqSources = new Set();
+      for (const entry of Array.isArray(entries) ? entries : [entries]) {
+        for (const def of entry?.definitions ?? []) {
+          if (def?.dictionary) dictNames.add(def.dictionary);
+        }
+        for (const freq of entry?.frequencies ?? []) {
+          if (freq?.dictionary) freqSources.add(freq.dictionary);
+        }
+      }
+      for (const name of dictNames) {
+        dynamicMarkers.push(`single-glossary-${name}`);
+      }
+      for (const name of freqSources) {
+        dynamicMarkers.push(`single-frequency-number-${name}`);
+      }
+    } catch {
+      log("warn", "anki_discover: failed to fetch lookup for dynamic marker discovery");
+    }
+
+    // Step 2: Probe all markers (static + dynamic)
+    const allMarkers = [...KNOWN_MARKERS, ...dynamicMarkers];
+    for (const marker of allMarkers) {
       try {
         const response = await client.getAnkiFields(testWord, "term", [marker], 1, false);
         if (response?.fields?.length > 0) {
           const value = response.fields[0][marker];
-          valid.push({ marker, sample: value ?? "" });
+          // Truncate sample for token efficiency
+          const sample = typeof value === "string" ? value.substring(0, 60) : "";
+          valid.push({ marker, sample });
         } else {
           invalid.push(marker);
         }
@@ -262,9 +309,13 @@ This probes each known marker against Yomitan's ankiFields API with a test word 
     const result = {
       valid_markers: valid,
       invalid_markers: invalid,
+      dynamic_patterns: [
+        "single-glossary-{dictionary name} — per-dictionary glossary (auto-discovered above)",
+        "single-frequency-number-{source name} — per-source frequency (auto-discovered above)",
+      ],
       note: "Use only the markers listed in 'valid_markers' when calling 'anki_fields'. " +
-        "If critical markers are missing, ask your human (user) to open Yomitan Settings → Anki → 'Configure Anki card format...' " +
-        "and screenshot ALL the Field/Value mappings in the popup window (scroll to the bottom). " +
+        "If critical markers are missing or auto-discovery fails, ask your human (user) to open Yomitan Settings → Anki → 'Configure Anki card format...' " +
+        "and screenshot ALL the Field/Value mappings in the popup window (scroll to the bottom on each tab: Expression, Reading, Kanji). " +
         "The Value column shows the available {markers}."
     };
 
