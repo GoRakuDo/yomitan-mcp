@@ -25,6 +25,65 @@ const server = new McpServer({
   version: "1.0.0"
 });
 
+// --- Response Optimization Utilities ---
+// Extract plain text from Yomitan's structured-content (recursive)
+function extractText(node) {
+  if (typeof node === "string") return node;
+  if (Array.isArray(node)) return node.map(extractText).join("");
+  if (node && typeof node === "object") {
+    if (node.type === "structured-content" && node.content) return extractText(node.content);
+    if (node.content) return extractText(node.content);
+    if (node.tag && node.content) return extractText(node.content);
+  }
+  return "";
+}
+
+// Slim down a dictionary entry for AI consumption
+function slimEntry(entry) {
+  if (typeof entry === "string") return entry;
+  if (entry && entry.type === "structured-content") return extractText(entry.content);
+  return String(entry ?? "");
+}
+
+// Optimize lookup response: strip rendering metadata, keep semantics
+function optimizeLookupResponse(data) {
+  if (!data?.dictionaryEntries) return data;
+  return {
+    entries: data.dictionaryEntries.map(e => ({
+      headwords: e.headwords?.map(h => ({
+        term: h.term,
+        reading: h.reading,
+        wordClasses: h.wordClasses
+      })),
+      definitions: e.definitions?.map(d => ({
+        dictionary: d.dictionary,
+        glossary: d.entries?.map(slimEntry)
+      })),
+      frequencies: e.frequencies?.map(f => ({
+        dictionary: f.dictionary,
+        value: f.displayValue ?? f.frequency
+      })),
+      pronunciations: e.pronunciations?.map(p => ({
+        dictionary: p.dictionary,
+        pitchAccents: p.pronunciations?.map(pa => pa.positions)
+      })),
+      inflections: e.inflectionRuleChainCandidates?.[0]?.inflectionRules
+    }))
+  };
+}
+
+// Optimize tokenize response
+function optimizeTokenizeResponse(data) {
+  if (!Array.isArray(data)) return data;
+  return data.map(parser => ({
+    id: parser.id,
+    tokens: parser.content?.map(token =>
+      token.map(t => ({ text: t.text, reading: t.reading || undefined }))
+        .filter(t => t.text)
+    )
+  }));
+}
+
 // Helper for error handling
 const handleApiError = (error, action) => {
   log("error", "Yomitan API Error", { action, error: error.message, stack: error.stack });
@@ -45,9 +104,9 @@ server.tool(
     log("info", "Executing lookup", { term });
     try {
       const response = await client.findTerms(term);
-      // Removed formatting (null, 2) to reduce token size for large Japanese dictionary entries
+      const optimized = optimizeLookupResponse(response);
       return {
-        content: [{ type: "text", text: JSON.stringify(response ?? null) }]
+        content: [{ type: "text", text: JSON.stringify(optimized ?? null) }]
       };
     } catch (error) {
       return handleApiError(error, "lookup");
@@ -88,8 +147,9 @@ server.tool(
     log("info", "Executing tokenize", { textLength: [...text].length, parser });
     try {
       const response = await client.tokenizeText(text, scanLength, parser);
+      const optimized = optimizeTokenizeResponse(response);
       return {
-        content: [{ type: "text", text: JSON.stringify(response ?? null) }]
+        content: [{ type: "text", text: JSON.stringify(optimized ?? null) }]
       };
     } catch (error) {
       return handleApiError(error, "tokenize");
