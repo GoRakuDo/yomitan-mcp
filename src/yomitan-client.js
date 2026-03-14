@@ -14,18 +14,11 @@ export class YomitanClient {
 
   /**
    * Send a request to the Yomitan HTTP API
-   * @param {string} action The action to perform (e.g. 'termsFind', 'kanjiFind')
-   * @param {object} params Basic parameters
-   * @param {object} body The main payload body (will be stringified in the request)
-   * @returns {Promise<any>} The parsed 'data' field from the response
+   * @param {string} action The action to perform (e.g. 'termEntries', 'kanjiEntries')
+   * @param {object} body The request body parameters
+   * @returns {Promise<any>} The parsed response data
    */
-  async invoke(action, params = {}, body = {}) {
-    const payload = {
-      action,
-      params,
-      body: JSON.stringify(body)
-    };
-
+  async invoke(action, body = {}) {
     const maxRetries = 3;
     const timeoutMs = 15000;
     let attempt = 0;
@@ -42,7 +35,7 @@ export class YomitanClient {
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(body),
           signal: controller.signal
         });
 
@@ -54,15 +47,8 @@ export class YomitanClient {
 
         const responseJson = await response.json();
 
-        // Check for errors returned by Yomitan
-        if (responseJson.responseStatusCode !== 200 && responseJson.responseStatusCode !== undefined) {
-            const errorMsg = responseJson.data ? 
-              (typeof responseJson.data === 'string' ? responseJson.data : JSON.stringify(responseJson.data)) : 
-              'Unknown error';
-            throw new Error(`Yomitan API Error (${responseJson.responseStatusCode}): ${errorMsg}`);
-        }
-
-        return responseJson.data;
+        // HTTP API returns the data directly (yomitan_api.py extracts 'data' from NativeMessaging response)
+        return responseJson;
       } catch (error) {
         clearTimeout(timeoutId);
         
@@ -91,15 +77,15 @@ export class YomitanClient {
   // --- Convenience Methods ---
 
   async findTerms(term) {
-    return this.invoke('termEntries', {}, { term });
+    return this.invoke('termEntries', { term });
   }
 
   async findKanji(character) {
-    return this.invoke('kanjiEntries', {}, { character });
+    return this.invoke('kanjiEntries', { character });
   }
 
   async tokenizeText(text, scanLength = 20, parser = 'internal') {
-    return this.invoke('tokenize', {}, { 
+    return this.invoke('tokenize', { 
       text, 
       scanLength, 
       parser 
@@ -107,7 +93,7 @@ export class YomitanClient {
   }
 
   async getAnkiFields(text, type = 'term', markers = [], maxEntries = 1, includeMedia = false) {
-    return this.invoke('ankiFields', {}, { 
+    return this.invoke('ankiFields', { 
       text, 
       type, 
       markers, 
@@ -117,6 +103,6 @@ export class YomitanClient {
   }
 
   async getVersion() {
-    return this.invoke('yomitanVersion', {}, {});
+    return this.invoke('yomitanVersion');
   }
 }

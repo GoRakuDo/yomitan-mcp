@@ -11,8 +11,7 @@ describe('YomitanClient', () => {
 
   it('should successfully make an API call to termsFind', async () => {
     const mockResponse = {
-      responseStatusCode: 200,
-      data: [{ headword: '食べる', reading: 'たべる' }]
+      dictionaryEntries: [{ headword: '食べる', reading: 'たべる' }]
     };
 
     global.fetch.mockResolvedValueOnce({
@@ -31,10 +30,9 @@ describe('YomitanClient', () => {
     expect(fetchArgs[1].signal).toBeDefined();
 
     const payload = JSON.parse(fetchArgs[1].body);
-    expect(payload.action).toBe('termEntries');
-    expect(JSON.parse(payload.body).term).toBe('食べる');
+    expect(payload.term).toBe('食べる');
 
-    expect(result).toEqual(mockResponse.data);
+    expect(result).toEqual(mockResponse);
   });
 
   it('should throw immediately (after retries) if connection is refused', async () => {
@@ -48,17 +46,13 @@ describe('YomitanClient', () => {
     expect(global.fetch).toHaveBeenCalledTimes(3);
   });
 
-  it('should throw if Yomitan returns a non-200 application error', async () => {
-    const mockResponse = {
-      responseStatusCode: 400,
-      data: 'Invalid query parameters'
-    };
-
+  it('should throw if HTTP response is not ok', async () => {
     global.fetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse
+      ok: false,
+      status: 500,
+      json: async () => ({})
     });
 
-    await expect(client.findTerms('err')).rejects.toThrow(/Yomitan API Error \(400\)/);
+    await expect(client.findTerms('err')).rejects.toThrow(/HTTP error! status: 500/);
   });
 });
