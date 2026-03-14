@@ -22,7 +22,7 @@ const client = new YomitanClient();
 // Create MCP Server
 const server = new McpServer({
   name: "yomitan-mcp",
-  version: "1.0.0"
+  version: "1.1.0"
 });
 
 // --- Response Optimization Utilities ---
@@ -88,6 +88,18 @@ function optimizeTokenizeResponse(data) {
     )
   }));
 }
+
+// Known Anki field markers for auto-discovery probing
+const KNOWN_MARKERS = [
+  "expression", "reading", "glossary", "sentence", "tags",
+  "furigana-plain", "furigana-html",
+  "pitch-accent-graphs", "pitch-accent-positions",
+  "audio", "screenshot", "document-title",
+  "clipboard-text", "clipboard-image",
+  "cloze-prefix", "cloze-body", "cloze-suffix",
+  "dictionary", "frequencies", "popup-selection-text",
+  "sentence-furigana",
+];
 
 // Helper for error handling
 const handleApiError = (error, action) => {
@@ -179,24 +191,86 @@ server.tool(
 // 4. anki_fields (renamed from yomitan_anki_fields)
 server.tool(
   "anki_fields",
-  "テキストからAnkiカード用のフィールドデータを生成する",
+  `Generate Anki flashcard field data from text using Yomitan's configured Anki templates.
+
+⚠️ IMPORTANT FOR AI AGENTS: The 'markers' parameter must match the markers configured in the user's Yomitan Anki settings.
+Common valid markers: expression, reading, glossary, sentence, tags, furigana-plain, furigana-html, pitch-accent-graphs, pitch-accent-positions, audio, popup-selection-text, frequencies, dictionary.
+Do NOT use 'headword' — use 'expression' instead.
+If unsure which markers are available, call the 'anki_discover' tool first to auto-detect valid markers.
+If you get HTTP 500 errors, the markers you requested likely do not exist in the user's Yomitan Anki configuration.`,
   {
-    text: z.string().describe("検索・生成元テキスト"),
-    type: z.enum(["term", "kanji"]).optional().default("term").describe("エントリのタイプ"),
-    markers: z.array(z.string()).describe("生成するAnkiフィールドマーカー（例: ['headword', 'reading', 'glossary']）"),
-    maxEntries: z.number().optional().default(1).describe("生成する最大エントリ数"),
-    includeMedia: z.boolean().optional().default(false).describe("メディア（音声等）を含めるか")
+    text: z.string().describe("The Japanese text to generate Anki card data for (e.g. 食べる)"),
+    type: z.enum(["term", "kanji"]).optional().default("term").describe("Entry type: 'term' for vocabulary, 'kanji' for kanji"),
+    markers: z.array(z.string()).describe("Anki field markers to generate. Use 'anki_discover' tool first to find valid markers. Common: ['expression', 'furigana-plain', 'glossary', 'sentence']"),
+    maxEntries: z.number().optional().default(1).describe("Maximum number of entries to generate"),
+    includeMedia: z.boolean().optional().default(false).describe("Whether to include media (audio, etc.)")
   },
   async ({ text, type, markers, maxEntries, includeMedia }) => {
-    log("info", "Executing anki_fields", { textLength: [...text].length, type });
+    log("info", "Executing anki_fields", { textLength: [...text].length, type, markers });
     try {
       const response = await client.getAnkiFields(text, type, markers, maxEntries, includeMedia);
       return {
         content: [{ type: "text", text: JSON.stringify(response ?? null) }]
       };
     } catch (error) {
+      // Enhanced error for anki_fields specifically
+      if (error.message.includes("status: 500")) {
+        const ankiHint = `Error executing anki_fields: ${error.message}\n\n` +
+          `💡 HINT for AI Agent: HTTP 500 from ankiFields usually means the markers you requested do not exist in the user's Yomitan Anki configuration.\n` +
+          `1. First, try calling the 'anki_discover' tool to auto-detect which markers are valid.\n` +
+          `2. Common mistake: using 'headword' instead of 'expression'. Use 'expression' for the word field.\n` +
+          `3. If auto-discovery also fails, ask your human (user) to screenshot the Yomitan Anki configuration:\n` +
+          `   → Open Yomitan Settings → Anki → "Configure Anki card format..."\n` +
+          `   → Screenshot ALL fields in the popup window, scrolling to the bottom to capture every field mapping.\n` +
+          `   → The 'Value' column shows which {markers} are mapped (e.g. {expression}, {furigana-plain}, {glossary}).\n` +
+          `   → Use ONLY the marker names shown in the Value column (without curly braces).`;
+        return { content: [{ type: "text", text: ankiHint }], isError: true };
+      }
       return handleApiError(error, "anki_fields");
     }
+  }
+);
+
+// 6. anki_discover — Auto-probe which Anki markers are valid
+server.tool(
+  "anki_discover",
+  `Auto-detect which Anki field markers are valid in the user's Yomitan configuration.
+Call this tool BEFORE using 'anki_fields' to discover which markers the user has configured.
+This probes each known marker against Yomitan's ankiFields API with a test word and reports which ones succeed.`,
+  {},
+  async () => {
+    log("info", "Executing anki_discover");
+    const testWord = "食べる";
+    const valid = [];
+    const invalid = [];
+    const errors = [];
+
+    for (const marker of KNOWN_MARKERS) {
+      try {
+        const response = await client.getAnkiFields(testWord, "term", [marker], 1, false);
+        if (response?.fields?.length > 0) {
+          const value = response.fields[0][marker];
+          valid.push({ marker, sample: value ?? "" });
+        } else {
+          invalid.push(marker);
+        }
+      } catch {
+        invalid.push(marker);
+      }
+    }
+
+    const result = {
+      valid_markers: valid,
+      invalid_markers: invalid,
+      note: "Use only the markers listed in 'valid_markers' when calling 'anki_fields'. " +
+        "If critical markers are missing, ask your human (user) to open Yomitan Settings → Anki → 'Configure Anki card format...' " +
+        "and screenshot ALL the Field/Value mappings in the popup window (scroll to the bottom). " +
+        "The Value column shows the available {markers}."
+    };
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(result) }]
+    };
   }
 );
 
