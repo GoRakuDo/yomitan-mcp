@@ -1,10 +1,29 @@
-name: Publish Package to GitHub Packages
+name: Publish Package
 on:
   release:
     types: [created]
 
 jobs:
-  build:
+  publish-npm:
+    name: Publish to npmjs.com
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '18.x'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-gpr:
+    name: Publish to GitHub Packages
+    needs: publish-npm
     runs-on: ubuntu-latest
     permissions:
       contents: read
