@@ -74,4 +74,4 @@ To use `anki_fields` effectively:
 - **Insufficient Permissions**: Ensure the Native Messaging component is correctly installed for your browser. You can test this within the Yomitan Settings page under "API".
 
 ---
-Built by [GoRakuDo](https://gorakudo.org). Licensed under MIT.
+Built by [GoRakuDo](https://gorakudo.org). Licensed under Mozilla Public License Version 2.0.

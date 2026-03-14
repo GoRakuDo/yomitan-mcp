@@ -22,7 +22,7 @@ const client = new YomitanClient();
 // Create MCP Server
 const server = new McpServer({
   name: "yomitan-mcp",
-  version: "1.2.0"
+  version: "1.2.1"
 });
 
 // --- Response Optimization Utilities ---
