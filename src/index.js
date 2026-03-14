@@ -47,6 +47,11 @@ function slimEntry(entry) {
 
 // Optimize lookup response: strip rendering metadata, keep semantics
 function optimizeLookupResponse(data) {
+  // If data is an array (e.g. from /termEntries endpoints returning multiple results), process each
+  if (Array.isArray(data)) {
+    return data.map(optimizeLookupResponse);
+  }
+  
   if (!data?.dictionaryEntries) return data;
   return {
     entries: data.dictionaryEntries.map(e => ({
