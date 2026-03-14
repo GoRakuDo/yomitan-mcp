@@ -1,5 +1,5 @@
 {
-  "name": "@gorakudo/yomitan-mcp-server",
+  "name": "yomitan-mcp-server",
   "version": "1.2.1",
   "description": "MCP server for Yomitan dictionary lookup",
   "main": "src/index.js",
@@ -38,8 +38,5 @@
   },
   "devDependencies": {
     "vitest": "^4.1.0"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   }
 }
