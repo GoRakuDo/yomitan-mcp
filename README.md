@@ -25,40 +25,37 @@ The server exposes 5 tools:
    - Enable "Yomitan API" (Ensure the server URL is `http://127.0.0.1:19633`).
 4. **Node.js** (v18+) installed.
 
-## Installation
-
-```bash
-git clone https://github.com/yomidevs/yomitan.git
-cd yomitan/mcp-server
-npm install
-
-# (Linux/macOS users only) Make the script executable
-chmod +x src/index.js
-```
-
-## Usage with OpenClaw (MCPorter)
-
-Add the following configuration to your OpenClaw `mcp_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "yomitan": {
-      "command": "node",
-      "args": ["/absolute/path/to/yomitan/mcp-server/src/index.js"],
-      "env": {
-        "YOMITAN_API_URL": "http://127.0.0.1:19633"
-      }
-    }
-  }
-}
-```
-
-## Security & Privacy
-
-- All lookups are performed entirely locally on your machine.
-- No data is sent to external servers by this MCP server.
-- The default HTTP API operates strictly on `localhost`.
+## Usage
+ 
+ You can run this MCP server directly using `npx` (no installation required):
+ 
+ ```bash
+ npx yomitan-mcp-server
+ ```
+ 
+ ### Usage with MCP Clients (Claude Desktop, Cursor, OpenClaw, etc.)
+ 
+ Add the following configuration to your MCP client's configuration file (e.g., `mcp_config.json`, `claude_desktop_config.json`):
+ 
+ ```json
+ {
+   "mcpServers": {
+     "yomitan-mcp": {
+       "command": "npx",
+       "args": [
+         "-y",
+         "yomitan-mcp-server@latest"
+       ]
+     }
+   }
+ }
+ ```
+ 
+ ## Security & Privacy
+ 
+ - All lookups are performed entirely locally on your machine.
+ - No data is sent to external servers by this MCP server.
+ - The default HTTP API operates strictly on `localhost`.
 
 ## Troubleshooting
 
