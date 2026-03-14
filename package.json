@@ -16,7 +16,10 @@
     "yomitan",
     "dictionary"
   ],
-  "author": "GoRakuDo",
+  "author": {
+    "name": "GoRakuDo",
+    "url": "https://gorakudo.org"
+  },
   "license": "GPL-3.0",
   "repository": {
     "type": "git",
