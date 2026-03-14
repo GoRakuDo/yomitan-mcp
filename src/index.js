@@ -92,8 +92,22 @@ function optimizeTokenizeResponse(data) {
 // Helper for error handling
 const handleApiError = (error, action) => {
   log("error", "Yomitan API Error", { action, error: error.message, stack: error.stack });
+  
+  let hint = "";
+  if (error.message.includes("ECONNREFUSED") || error.message.includes("Failed to connect")) {
+    hint = "\n\n💡 HINT for AI Agent: The Yomitan API server is unreachable. Please instruct the user to:\n1. Open their browser (Chrome/Firefox) and ensure it is not suspended.\n2. Ensure the Yomitan extension is active.\n3. Verify that 'Enable Yomitan API' is checked in Yomitan Settings -> Advanced -> API.";
+  } else if (error.message.includes("timeout")) {
+    hint = "\n\n💡 HINT for AI Agent: The request to Yomitan timed out. The browser might be sleeping, or Yomitan's Native Messaging host is unresponsive. Ask the user to click into their browser to wake it up or restart the browser.";
+  } else if (error.message.includes("status: 500")) {
+    hint = "\n\n💡 HINT for AI Agent: Yomitan returned an internal error (HTTP 500). This occurs when the Yomitan extension itself errors out. Common causes: missing dictionaries (e.g., trying to use 'kanji' tool without a Kanji dictionary installed in Yomitan) or an invalid search term format.";
+  } else if (error.message.includes("status: 404")) {
+    hint = "\n\n💡 HINT for AI Agent: Endpoint not found (HTTP 404). This implies the Yomitan API is running, but the specific feature/endpoint is missing. The user's Yomitan extension version might be too old.";
+  } else if (error.message.includes("fetch failed")) {
+    hint = "\n\n💡 HINT for AI Agent: Failed to fetch data from localhost. The browser is likely closed or the Yomitan extension is disabled.";
+  }
+
   return {
-    content: [{ type: "text", text: `Error: ${error.message}` }],
+    content: [{ type: "text", text: `Error executing ${action}: ${error.message}${hint}` }],
     isError: true
   };
 };
