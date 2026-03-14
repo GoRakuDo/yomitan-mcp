@@ -24,7 +24,7 @@ describe('YomitanClient', () => {
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
     const fetchArgs = global.fetch.mock.calls[0];
-    expect(fetchArgs[0]).toBe('http://localhost:19633');
+    expect(fetchArgs[0]).toBe('http://localhost:19633/termEntries');
     expect(fetchArgs[1].method).toBe('POST');
     
     // タイムアウト設定が追加されたため、signalが含まれている

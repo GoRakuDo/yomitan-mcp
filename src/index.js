@@ -47,7 +47,7 @@ server.tool(
       const response = await client.findTerms(term);
       // Removed formatting (null, 2) to reduce token size for large Japanese dictionary entries
       return {
-        content: [{ type: "text", text: JSON.stringify(response) }]
+        content: [{ type: "text", text: JSON.stringify(response ?? null) }]
       };
     } catch (error) {
       return handleApiError(error, "lookup");
@@ -67,7 +67,7 @@ server.tool(
     try {
       const response = await client.findKanji(character);
       return {
-        content: [{ type: "text", text: JSON.stringify(response) }]
+        content: [{ type: "text", text: JSON.stringify(response ?? null) }]
       };
     } catch (error) {
       return handleApiError(error, "kanji");
@@ -89,7 +89,7 @@ server.tool(
     try {
       const response = await client.tokenizeText(text, scanLength, parser);
       return {
-        content: [{ type: "text", text: JSON.stringify(response) }]
+        content: [{ type: "text", text: JSON.stringify(response ?? null) }]
       };
     } catch (error) {
       return handleApiError(error, "tokenize");
@@ -113,7 +113,7 @@ server.tool(
     try {
       const response = await client.getAnkiFields(text, type, markers, maxEntries, includeMedia);
       return {
-        content: [{ type: "text", text: JSON.stringify(response) }]
+        content: [{ type: "text", text: JSON.stringify(response ?? null) }]
       };
     } catch (error) {
       return handleApiError(error, "anki_fields");

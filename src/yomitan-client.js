@@ -35,7 +35,9 @@ export class YomitanClient {
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
-        const response = await fetch(this.baseUrl, {
+        // Build URL including action path e.g. http://127.0.0.1:19633/termEntries
+        const url = new URL(action, this.baseUrl).toString();
+        const response = await fetch(url, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
