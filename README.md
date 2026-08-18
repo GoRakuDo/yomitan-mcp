@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/gorakudo-yomitan-mcp-badge.png)](https://mseep.ai/app/gorakudo-yomitan-mcp)
+
 # Yomitan MCP Server
 
 A Model Context Protocol (MCP) server that provides AI agents with direct access to your local Yomitan dictionary databases.
